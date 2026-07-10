@@ -1,12 +1,72 @@
 /* ═══════════════════════════════════════════
    CACCIA AL LAVORO — logica dell'app
-   Salvataggio locale (localStorage), nessuna
-   dipendenza esterna oltre ai font Google.
+   Autenticazione Google + Firebase Realtime
+   Database: ogni utente vede solo i suoi dati,
+   sincronizzati automaticamente tra dispositivi.
    ═══════════════════════════════════════════ */
 
-const STORAGE_KEY = 'caccialavoro_v1';
+const firebaseConfig = {
+  apiKey: "AIzaSyDlKhAp5QDXlu79C8i5X-dZ27Fyvzu1HVs",
+  authDomain: "jobhunt-5eadd.firebaseapp.com",
+  projectId: "jobhunt-5eadd",
+  storageBucket: "jobhunt-5eadd.firebasestorage.app",
+  messagingSenderId: "667855566762",
+  appId: "1:667855566762:web:20988f5e81f2b4b6fa1dd3"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+let currentUser = null;
+let jobsRef = null;
 let jobs = [];
-try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { jobs = []; }
+
+function loginGoogle() {
+  const status = document.getElementById('login-status');
+  status.textContent = 'Accesso in corso…';
+  auth.signInWithPopup(googleProvider).catch(err => {
+    status.textContent = '⚠️ ' + err.message;
+  });
+}
+
+function logout() {
+  if (jobsRef) { jobsRef.off(); jobsRef = null; }
+  auth.signOut();
+}
+
+function subscribeJobs(uid) {
+  jobsRef = db.ref('users/' + uid + '/jobs');
+  jobsRef.on('value', snap => {
+    const val = snap.val() || {};
+    jobs = Object.keys(val).map(k => ({ id: k, ...val[k] }));
+    render();
+  }, err => {
+    toast('⚠️ Errore di sincronizzazione: ' + err.message, 4000);
+  });
+}
+
+auth.onAuthStateChanged(user => {
+  const loginScreen = document.getElementById('login-screen');
+  const appContent = document.getElementById('app-content');
+  const userBadge = document.getElementById('user-badge');
+  if (user) {
+    currentUser = user;
+    loginScreen.style.display = 'none';
+    appContent.style.display = 'block';
+    userBadge.style.display = 'flex';
+    document.getElementById('user-avatar').src = user.photoURL || '';
+    document.getElementById('user-name').textContent = user.displayName || user.email || '';
+    subscribeJobs(user.uid);
+  } else {
+    currentUser = null;
+    if (jobsRef) { jobsRef.off(); jobsRef = null; }
+    jobs = [];
+    loginScreen.style.display = 'flex';
+    appContent.style.display = 'none';
+    userBadge.style.display = 'none';
+  }
+});
 
 let currentSort = 'data';
 let editingId = null;
@@ -25,8 +85,6 @@ const STATO_LABEL = {
   'ritirata':         '🚫 Ritirata'
 };
 const STATO_RANK = Object.fromEntries(STATO_ORDER.map((s,i)=>[s,i]));
-
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs)); }
 
 function toast(msg, ms=2200) {
   const t = document.getElementById('toast');
@@ -208,19 +266,23 @@ function setSort(s) {
 
 /* ─── azioni rapide dalla card ─── */
 function quickStato(id) {
+  if(!currentUser) return;
   const j = jobs.find(x=>x.id===id);
   if(!j) return;
   const cur = STATO_ORDER.indexOf(j.stato||'da-candidarsi');
-  j.stato = STATO_ORDER[(cur+1) % STATO_ORDER.length];
-  save(); render();
-  toast(`Stato aggiornato: ${STATO_LABEL[j.stato]}`);
+  const next = STATO_ORDER[(cur+1) % STATO_ORDER.length];
+  db.ref(`users/${currentUser.uid}/jobs/${id}/stato`).set(next)
+    .then(()=> toast(`Stato aggiornato: ${STATO_LABEL[next]}`))
+    .catch(err=> toast('⚠️ ' + err.message));
 }
 function quickContattata(id) {
+  if(!currentUser) return;
   const j = jobs.find(x=>x.id===id);
   if(!j) return;
-  j.contattata = !j.contattata;
-  save(); render();
-  toast(j.contattata ? '📞 Segnata come contattata' : '📵 Segnata come non contattata');
+  const nuovo = !j.contattata;
+  db.ref(`users/${currentUser.uid}/jobs/${id}/contattata`).set(nuovo)
+    .then(()=> toast(nuovo ? '📞 Segnata come contattata' : '📵 Segnata come non contattata'))
+    .catch(err=> toast('⚠️ ' + err.message));
 }
 
 /* ─── modale ─── */
@@ -302,6 +364,7 @@ function updateToggleDisplay(field){
 
 /* ─── salvataggio ─── */
 function saveJob() {
+  if(!currentUser) { toast('⚠️ Devi accedere per salvare'); return; }
   const ruolo = document.getElementById('f-ruolo').value.trim();
   const azienda = document.getElementById('f-azienda').value.trim();
   if(!ruolo || !azienda) {
@@ -312,7 +375,6 @@ function saveJob() {
   const txt = id => document.getElementById(id).value.trim();
 
   const data = {
-    id: editingId || String(Date.now()),
     ruolo, azienda,
     link: txt('f-link'),
     sede: txt('f-sede'),
@@ -337,16 +399,13 @@ function saveJob() {
     note: txt('f-note')
   };
 
-  if(editingId) {
-    const idx = jobs.findIndex(x=>x.id===editingId);
-    if(idx>-1) jobs[idx] = data;
-  } else {
-    jobs.push(data);
-  }
-  save();
-  closeModal();
-  render();
-  toast(editingId ? '✏️ Candidatura aggiornata' : '✅ Candidatura aggiunta');
+  const id = editingId || db.ref(`users/${currentUser.uid}/jobs`).push().key;
+  db.ref(`users/${currentUser.uid}/jobs/${id}`).set(data)
+    .then(()=>{
+      closeModal();
+      toast(editingId ? '✏️ Candidatura aggiornata' : '✅ Candidatura aggiunta');
+    })
+    .catch(err => toast('⚠️ Errore: ' + err.message, 4000));
 }
 
 /* ─── eliminazione ─── */
@@ -359,10 +418,10 @@ function cancelDelete() {
   document.getElementById('confirm-dialog').classList.remove('open');
 }
 function confirmDelete() {
-  if(deletingId) {
-    jobs = jobs.filter(j=>j.id!==deletingId);
-    save(); render();
-    toast('🗑️ Candidatura eliminata');
+  if(deletingId && currentUser) {
+    db.ref(`users/${currentUser.uid}/jobs/${deletingId}`).remove()
+      .then(()=> toast('🗑️ Candidatura eliminata'))
+      .catch(err=> toast('⚠️ Errore: ' + err.message, 4000));
   }
   cancelDelete();
 }
@@ -379,5 +438,7 @@ function exportData() {
   toast('💾 Dati esportati');
 }
 
-/* ─── init ─── */
-render();
+/* ─── init ───
+   Il rendering parte automaticamente da
+   auth.onAuthStateChanged() qui sopra, quando
+   lo stato di login viene determinato. */

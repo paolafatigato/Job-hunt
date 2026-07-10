@@ -1,0 +1,16 @@
+{
+  "name": "Caccia al Lavoro",
+  "short_name": "Caccia al Lavoro",
+  "description": "Il tuo diario della ricerca lavoro",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFAF7",
+  "theme_color": "#0259DE",
+  "icons": [
+    { "src": "logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "logo.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "logo.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
