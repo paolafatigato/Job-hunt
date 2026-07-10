@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caccia al Lavoro 💼</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">
+    <span class="logo-emoji">💼</span>
+    <div>
+      <div class="site-title">Caccia al Lavoro</div>
+      <div class="site-subtitle">Il tuo diario della ricerca lavoro</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="exportData()" title="Esporta JSON">💾 <span class="hdr-txt">Esporta</span></button>
+    <button class="btn btn-primary" onclick="openModal()">+ <span class="hdr-txt">Aggiungi candidatura</span></button>
+  </div>
+</header>
+
+<div class="controls">
+  <span class="sort-label">Ordina per:</span>
+  <div class="sort-pills">
+    <button class="pill active" onclick="setSort('data')" id="pill-data">🕐 Data</button>
+    <button class="pill" onclick="setSort('stelline')" id="pill-stelline">⭐ Gradimento</button>
+    <button class="pill" onclick="setSort('stipendio')" id="pill-stipendio">💰 Stipendio</button>
+    <button class="pill" onclick="setSort('distCasa')" id="pill-distCasa">🏠 Distanza casa</button>
+    <button class="pill" onclick="setSort('distStazione')" id="pill-distStazione">🚂 Distanza stazione</button>
+    <button class="pill" onclick="setSort('stato')" id="pill-stato">📌 Stato</button>
+  </div>
+  <span class="count-badge" id="count-badge">0 candidature</span>
+</div>
+
+<div class="stats-bar" id="stats-bar" style="display:none;"></div>
+
+<div class="grid" id="grid"></div>
+
+<!-- ─── MODAL ─── -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Aggiungi candidatura</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="sec">📍 Informazioni generali</div>
+      <div class="form-row full">
+        <div class="fg"><label>Ruolo / posizione *</label>
+          <input type="text" id="f-ruolo" placeholder="es. Docente di sostegno, Copywriter, UX Designer..."></div>
+      </div>
+      <div class="form-row full">
+        <div class="fg"><label>Azienda / scuola / ente *</label>
+          <input type="text" id="f-azienda" placeholder="es. Istituto XY, Studio ABC..."></div>
+      </div>
+      <div class="form-row full">
+        <div class="fg"><label>Link annuncio</label>
+          <input type="url" id="f-link" placeholder="https://..."></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Sede / città</label>
+          <input type="text" id="f-sede" placeholder="es. Piacenza"></div>
+        <div class="fg"><label>Dove trovato</label>
+          <select id="f-dove">
+            <option value="">—</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Indeed">Indeed</option>
+            <option value="InfoJobs">InfoJobs</option>
+            <option value="Sito aziendale">Sito aziendale / bando</option>
+            <option value="Passaparola">Passaparola</option>
+            <option value="Agenzia per il lavoro">Agenzia per il lavoro</option>
+            <option value="Altro">Altro</option>
+          </select></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Modalità</label>
+          <select id="f-modalita">
+            <option value="">—</option>
+            <option value="In sede">🏢 In sede</option>
+            <option value="Remoto">🏠 Remoto</option>
+            <option value="Ibrido">🔀 Ibrido</option>
+          </select></div>
+        <div class="fg"><label>Tipo contratto</label>
+          <select id="f-contratto">
+            <option value="">—</option>
+            <option value="Indeterminato">Indeterminato</option>
+            <option value="Determinato">Determinato</option>
+            <option value="Stage/Tirocinio">Stage / Tirocinio</option>
+            <option value="Part-time">Part-time</option>
+            <option value="Freelance/P.IVA">Freelance / P.IVA</option>
+            <option value="Supplenza">Supplenza</option>
+          </select></div>
+      </div>
+
+      <div class="sec">💰 Retribuzione</div>
+      <div class="form-row">
+        <div class="fg"><label>Stipendio (€)</label>
+          <input type="number" id="f-stipendio" placeholder="1400" min="0" step="50"></div>
+        <div class="fg"><label>Tipo importo</label>
+          <select id="f-stipendio-tipo">
+            <option value="Netto mensile">Netto mensile</option>
+            <option value="Lordo mensile">Lordo mensile</option>
+            <option value="RAL annua">RAL annua</option>
+          </select></div>
+      </div>
+
+      <div class="sec">📏 Spostamenti</div>
+      <div style="font-size:.72rem;color:var(--tl);margin-bottom:.45rem;">Distanze in km, tempi in minuti. Lascia vuoto se non applicabile.</div>
+      <div class="form-row dist-block" style="gap:.45rem;">
+        <div class="fg" style="min-width:0;">
+          <label style="font-size:.75rem;margin-bottom:4px;">🏠 Da casa</label>
+          <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
+            <input type="number" class="compact-input" id="f-casa-km" placeholder="📍 km" min="0" step="0.5">
+            <input type="number" class="compact-input" id="f-casa-auto" placeholder="🚗 min" min="0">
+            <input type="number" class="compact-input" id="f-casa-mezzi" placeholder="🚌 min" min="0">
+          </div>
+        </div>
+        <div class="fg" style="min-width:0;">
+          <label style="font-size:.75rem;margin-bottom:4px;">🚂 Da stazione</label>
+          <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
+            <input type="number" class="compact-input" id="f-staz-km" placeholder="📍 km" min="0" step="0.5">
+            <input type="number" class="compact-input" id="f-staz-piedi" placeholder="🚶 min" min="0">
+          </div>
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg"><label>Macchina necessaria?</label>
+          <div class="toggle-pair">
+            <button class="tgl sel-no" id="tb-macc-si" onclick="setToggle('macchina',true)">🚗 Sì, serve</button>
+            <button class="tgl" id="tb-macc-no" onclick="setToggle('macchina',false)">🚫 Non serve</button>
+          </div></div>
+      </div>
+
+      <div class="sec">📞 Candidatura</div>
+      <div class="form-row">
+        <div class="fg"><label>Azienda contattata?</label>
+          <div class="toggle-pair">
+            <button class="tgl sel-no" id="tb-con-si" onclick="setToggle('contattata',true)">📞 Sì, contattata</button>
+            <button class="tgl" id="tb-con-no" onclick="setToggle('contattata',false)">📵 Non ancora</button>
+          </div></div>
+        <div class="fg"><label>Referente / contatto</label>
+          <input type="text" id="f-referente" placeholder="es. nome, telefono, email..."></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Stato candidatura</label>
+          <select id="f-stato">
+            <option value="da-candidarsi">🆕 Da candidarsi</option>
+            <option value="candidato">📨 Candidatura inviata</option>
+            <option value="colloquio-fissato">📅 Colloquio fissato</option>
+            <option value="colloquio-fatto">✅ Colloquio fatto</option>
+            <option value="offerta">🎉 Offerta ricevuta</option>
+            <option value="rifiutato">❌ Rifiutata</option>
+            <option value="ritirata">🚫 Ritirata da me</option>
+          </select></div>
+        <div class="fg"><label>📅 Data colloquio / scadenza</label>
+          <input type="datetime-local" id="f-data-colloquio" class="appt-input"></div>
+      </div>
+
+      <div class="sec">⭐ Gradimento personale</div>
+      <div class="star-input" id="star-input">
+        <button class="star-btn" data-v="1" onclick="setStar(1)">★</button>
+        <button class="star-btn" data-v="2" onclick="setStar(2)">★</button>
+        <button class="star-btn" data-v="3" onclick="setStar(3)">★</button>
+        <button class="star-btn" data-v="4" onclick="setStar(4)">★</button>
+        <button class="star-btn" data-v="5" onclick="setStar(5)">★</button>
+        <button class="star-btn" data-v="6" onclick="setStar(6)">★</button>
+        <button class="star-btn" data-v="7" onclick="setStar(7)">★</button>
+        <button class="star-btn" data-v="8" onclick="setStar(8)">★</button>
+        <button class="star-btn" data-v="9" onclick="setStar(9)">★</button>
+        <button class="star-btn" data-v="10" onclick="setStar(10)">★</button>
+      </div>
+
+      <div class="sec">✅ Lati positivi</div>
+      <div class="form-row full">
+        <div class="fg"><textarea id="f-pro" placeholder="Es. orario comodo, colleghi disponibili, crescita professionale..."></textarea></div>
+      </div>
+
+      <div class="sec">❌ Lati negativi</div>
+      <div class="form-row full">
+        <div class="fg"><textarea id="f-contro" placeholder="Es. stipendio basso, tanti straordinari, contratto breve..."></textarea></div>
+      </div>
+
+      <div class="sec">📝 Note libere</div>
+      <div class="form-row full">
+        <div class="fg"><textarea id="f-note" placeholder="Qualsiasi cosa vuoi ricordare: domande da fare, impressioni, follow-up..." style="min-height:55px;"></textarea></div>
+      </div>
+
+    </div><!-- /modal-body -->
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn btn-primary" onclick="saveJob()">💾 Salva candidatura</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── CONFIRM DELETE ─── -->
+<div class="confirm-dialog" id="confirm-dialog">
+  <div class="confirm-box">
+    <h4>🗑️ Elimina candidatura</h4>
+    <p>Sei sicura di voler eliminare questa candidatura? Non potrai recuperarla.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="cancelDelete()">Annulla</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Sì, elimina</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── TOAST ─── -->
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
